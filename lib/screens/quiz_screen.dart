@@ -1,3 +1,4 @@
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -33,6 +34,7 @@ class _QuizScreenState extends State<QuizScreen> {
 
   int currentQuestionIndex = 0;
   int score = 0;
+  int? frozenScore;
 
   bool isLoading = false;
   bool isFinished = false;
@@ -45,10 +47,10 @@ class _QuizScreenState extends State<QuizScreen> {
   String? roundId;
   String? roundUid;
 
-  int? frozenScore;
   DateTime? lastRequestTime;
 
   QuizCloudState cloudState = QuizCloudState.playing;
+  SubmissionFault selectedFault = SubmissionFault.none;
 
   @override
   void initState() {
@@ -76,16 +78,16 @@ class _QuizScreenState extends State<QuizScreen> {
   bool get canReplay {
     return !isLoading &&
         !isWorking &&
-        (cloudState == QuizCloudState.readyToSubmit && !submissionStarted ||
+        ((cloudState == QuizCloudState.readyToSubmit &&
+                !submissionStarted) ||
             cloudState == QuizCloudState.cloudVerified);
   }
 
   Future<void> loadQuestions() async {
     if (isLoading || hasUnresolvedSubmission) return;
-
-    // A submitted round must be verified before starting another one.
     if (isFinished && !canReplay) return;
 
+    // OpenTDB requires spacing between question requests.
     if (lastRequestTime != null) {
       final elapsed = DateTime.now().difference(lastRequestTime!);
 
@@ -120,7 +122,7 @@ class _QuizScreenState extends State<QuizScreen> {
 
       if (!mounted) return;
 
-      // Ignore question results from an earlier signed-in account.
+      // Never apply questions fetched for a different account.
       if (FirebaseAuth.instance.currentUser?.uid != user.uid) {
         setState(() {
           isLoading = false;
@@ -135,13 +137,16 @@ class _QuizScreenState extends State<QuizScreen> {
         currentQuestionIndex = 0;
         score = 0;
         frozenScore = null;
+
         isFinished = false;
         isLoading = false;
         isWorking = false;
         submissionStarted = false;
-        injectLostAcknowledgement = false;
 
-        // Only a new round receives a new document ID.
+        injectLostAcknowledgement = false;
+        selectedFault = SubmissionFault.none;
+
+        // A new quiz receives a new ID; retries never change it.
         roundId = attemptRepository.createRoundId();
         roundUid = user.uid;
         cloudState = QuizCloudState.playing;
@@ -181,8 +186,6 @@ class _QuizScreenState extends State<QuizScreen> {
         currentQuestionIndex++;
       } else {
         isFinished = true;
-
-        // Freeze the score when the ten-question round ends.
         frozenScore = score;
         cloudState = QuizCloudState.readyToSubmit;
       }
@@ -195,8 +198,10 @@ class _QuizScreenState extends State<QuizScreen> {
         cloudState = QuizCloudState.cloudVerified;
         break;
       case AttemptStatus.notFound:
-        // A server-confirmed absence permits a controlled retry.
         cloudState = QuizCloudState.readyToSubmit;
+        // The next manual submission should use the real repository.
+        selectedFault = SubmissionFault.none;
+        injectLostAcknowledgement = false;
         break;
       case AttemptStatus.verificationUnavailable:
         cloudState = QuizCloudState.verificationUnavailable;
@@ -228,6 +233,7 @@ class _QuizScreenState extends State<QuizScreen> {
     final uid = roundUid!;
     final id = roundId!;
     final submittedScore = frozenScore!;
+    final fault = selectedFault;
 
     setState(() {
       isWorking = true;
@@ -241,16 +247,18 @@ class _QuizScreenState extends State<QuizScreen> {
       roundId: id,
       score: submittedScore,
       injectLostAcknowledgement: injectLostAcknowledgement,
+      fault: fault,
     );
 
     if (!mounted) return;
 
-    if (FirebaseAuth.instance.currentUser?.uid != uid || roundId != id) {
+    if (FirebaseAuth.instance.currentUser?.uid != uid ||
+        roundId != id) {
       setState(() {
         isWorking = false;
         cloudState = QuizCloudState.saveUnknown;
         cloudMessage =
-            'The account changed. The original submission needs recovery.';
+            'The account changed. The original round needs recovery.';
       });
       return;
     }
@@ -288,11 +296,13 @@ class _QuizScreenState extends State<QuizScreen> {
 
     if (!mounted) return;
 
-    if (FirebaseAuth.instance.currentUser?.uid != uid || roundId != id) {
+    if (FirebaseAuth.instance.currentUser?.uid != uid ||
+        roundId != id) {
       setState(() {
         isWorking = false;
         cloudState = QuizCloudState.saveUnknown;
-        cloudMessage = 'Authentication changed during verification.';
+        cloudMessage =
+            'Authentication changed during verification.';
       });
       return;
     }
@@ -323,14 +333,21 @@ class _QuizScreenState extends State<QuizScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.wifi_off, size: 56, color: Colors.orange),
+            const Icon(
+              Icons.wifi_off,
+              size: 56,
+              color: Colors.orange,
+            ),
             const SizedBox(height: 16),
             Text(
               errorMessage ?? 'Unable to load questions.',
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
-            FilledButton(onPressed: loadQuestions, child: const Text('Retry')),
+            FilledButton(
+              onPressed: loadQuestions,
+              child: const Text('Retry'),
+            ),
           ],
         ),
       ),
@@ -350,10 +367,15 @@ class _QuizScreenState extends State<QuizScreen> {
         children: [
           Text(
             'Question ${currentQuestionIndex + 1} of 10',
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 12),
-          LinearProgressIndicator(value: (currentQuestionIndex + 1) / 10),
+          LinearProgressIndicator(
+            value: (currentQuestionIndex + 1) / 10,
+          ),
           const SizedBox(height: 12),
           Text('Current score: $score'),
           const SizedBox(height: 24),
@@ -410,12 +432,80 @@ class _QuizScreenState extends State<QuizScreen> {
             FilledButton(
               onPressed: nextQuestion,
               child: Text(
-                currentQuestionIndex == 9 ? 'View Results' : 'Next Question',
+                currentQuestionIndex == 9
+                    ? 'View Results'
+                    : 'Next Question',
               ),
             ),
           ],
         ],
       ),
+    );
+  }
+
+  Widget buildFaultControls() {
+    // Fault controls are visible only in debug builds.
+    assert(() {
+      return true;
+    }());
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 16),
+        const Text(
+          'Development Fault Testing',
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<SubmissionFault>(
+          initialValue: selectedFault,
+          decoration: const InputDecoration(
+            labelText: 'Simulated submission error',
+            border: OutlineInputBorder(),
+          ),
+          items: const [
+            DropdownMenuItem(
+              value: SubmissionFault.none,
+              child: Text('None'),
+            ),
+            DropdownMenuItem(
+              value: SubmissionFault.unavailable,
+              child: Text('unavailable'),
+            ),
+            DropdownMenuItem(
+              value: SubmissionFault.resourceExhausted,
+              child: Text('resource-exhausted'),
+            ),
+          ],
+          onChanged: (fault) {
+            if (fault == null) return;
+
+            setState(() {
+              selectedFault = fault;
+              if (fault != SubmissionFault.none) {
+                injectLostAcknowledgement = false;
+              }
+            });
+          },
+        ),
+        const SizedBox(height: 8),
+        SwitchListTile(
+          title: const Text('Inject lost acknowledgement'),
+          subtitle: const Text('T09 development test'),
+          value: injectLostAcknowledgement,
+          onChanged: selectedFault == SubmissionFault.none
+              ? (value) {
+                  setState(() {
+                    injectLostAcknowledgement = value;
+                  });
+                }
+              : null,
+        ),
+      ],
     );
   }
 
@@ -430,7 +520,10 @@ class _QuizScreenState extends State<QuizScreen> {
         const SizedBox(height: 12),
         const Text(
           'Cloud Submission',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         const SizedBox(height: 8),
         SelectableText('Round ID: ${roundId ?? "Not created"}'),
@@ -455,16 +548,22 @@ class _QuizScreenState extends State<QuizScreen> {
 
         if (canSubmit)
           FilledButton.icon(
-            onPressed: isWorking || !accountMatches ? null : submitQuiz,
+            onPressed: isWorking || !accountMatches
+                ? null
+                : submitQuiz,
             icon: const Icon(Icons.cloud_upload),
             label: Text(
-              submissionStarted ? 'Retry Same Round ID' : 'Submit to Firestore',
+              submissionStarted
+                  ? 'Retry Same Round ID'
+                  : 'Submit to Firestore',
             ),
           ),
 
         if (needsRecovery)
           FilledButton.icon(
-            onPressed: isWorking || !accountMatches ? null : verifySavedAttempt,
+            onPressed: isWorking || !accountMatches
+                ? null
+                : verifySavedAttempt,
             icon: const Icon(Icons.cloud_sync),
             label: const Text('Recover from Server'),
           ),
@@ -487,28 +586,17 @@ class _QuizScreenState extends State<QuizScreen> {
           const Center(child: CircularProgressIndicator()),
         ],
 
-        // This fault switch is only for the later T09 test.
         if (!submissionStarted &&
             !isWorking &&
             cloudState == QuizCloudState.readyToSubmit)
-          SwitchListTile(
-            title: const Text('Inject lost acknowledgement'),
-            subtitle: const Text('Development test only'),
-            value: injectLostAcknowledgement,
-            onChanged: (value) {
-              setState(() {
-                injectLostAcknowledgement = value;
-              });
-            },
-          ),
+          buildFaultControls(),
 
         if (needsRecovery)
           const Padding(
             padding: EdgeInsets.only(top: 12),
             child: Text(
               'The save outcome is not confirmed. '
-              'Reconnect to the internet and use Recover from Server. '
-              'Do not start a new round yet.',
+              'Use Recover from Server before retrying.',
             ),
           ),
       ],
@@ -530,22 +618,31 @@ class _QuizScreenState extends State<QuizScreen> {
           const Text(
             'Quiz Completed!',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 12),
           Text(
             'Your score: $score / 10',
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 24),
           const Text(
             'Answer Review',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 12),
 
-          // Keep the complete review visible after the round ends.
+          // Show all ten answers after finishing the quiz.
           for (int i = 0; i < questions.length; i++) ...[
             Card(
               child: Padding(
@@ -555,28 +652,34 @@ class _QuizScreenState extends State<QuizScreen> {
                   children: [
                     Text(
                       '${i + 1}. ${questions[i].question}',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text('Your answer: ${selectedAnswers[i]}'),
                     const SizedBox(height: 4),
-                    Text('Correct answer: ${questions[i].correctAnswer}'),
+                    Text(
+                      'Correct answer: ${questions[i].correctAnswer}',
+                    ),
                     const SizedBox(height: 8),
                     Row(
                       children: [
                         Icon(
-                          selectedAnswers[i] == questions[i].correctAnswer
+                          selectedAnswers[i] ==
+                                  questions[i].correctAnswer
                               ? Icons.check_circle
                               : Icons.cancel,
-                          color:
-                              selectedAnswers[i] == questions[i].correctAnswer
+                          color: selectedAnswers[i] ==
+                                  questions[i].correctAnswer
                               ? Colors.green
                               : Colors.red,
                           size: 18,
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          selectedAnswers[i] == questions[i].correctAnswer
+                          selectedAnswers[i] ==
+                                  questions[i].correctAnswer
                               ? 'Correct'
                               : 'Incorrect',
                         ),
@@ -591,7 +694,6 @@ class _QuizScreenState extends State<QuizScreen> {
           const SizedBox(height: 20),
           buildCloudSection(),
           const SizedBox(height: 20),
-
           FilledButton.icon(
             onPressed: canReplay ? loadQuestions : null,
             icon: const Icon(Icons.refresh),
@@ -614,10 +716,10 @@ class _QuizScreenState extends State<QuizScreen> {
         body: isLoading
             ? buildLoadingScreen()
             : questions.isEmpty
-            ? buildErrorScreen()
-            : isFinished
-            ? buildResultsScreen()
-            : buildQuizScreen(),
+                ? buildErrorScreen()
+                : isFinished
+                    ? buildResultsScreen()
+                    : buildQuizScreen(),
       ),
     );
   }

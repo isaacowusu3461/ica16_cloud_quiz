@@ -1,3 +1,4 @@
+
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -12,6 +13,12 @@ enum AttemptStatus {
   saveUnknown,
 }
 
+enum SubmissionFault {
+  none,
+  unavailable,
+  resourceExhausted,
+}
+
 class AttemptResult {
   final AttemptStatus status;
   final String message;
@@ -24,11 +31,13 @@ class AttemptRepository {
   final FirebaseFirestore firestore;
   final FirebaseAuth auth;
 
-  AttemptRepository({FirebaseFirestore? firestore, FirebaseAuth? auth})
-    : firestore = firestore ?? FirebaseFirestore.instance,
-      auth = auth ?? FirebaseAuth.instance;
+  AttemptRepository({
+    FirebaseFirestore? firestore,
+    FirebaseAuth? auth,
+  })  : firestore = firestore ?? FirebaseFirestore.instance,
+        auth = auth ?? FirebaseAuth.instance;
 
-  // This creates an ID without saving anything to Firestore.
+  // Generate the ID before submitting. A retry keeps this same ID.
   String createRoundId() {
     return firestore.collection('users').doc().id;
   }
@@ -55,11 +64,9 @@ class AttemptRepository {
     };
   }
 
-  // A saved attempt must have exactly the six required fields.
+  // Check the fixed fields and the resolved server timestamp.
   bool matchesPayload(Map<String, dynamic>? data, int score) {
-    if (data == null || data.length != 6) {
-      return false;
-    }
+    if (data == null || data.length != 6) return false;
 
     return data['schemaVersion'] == 1 &&
         data['variant'] == 'A' &&
@@ -69,7 +76,7 @@ class AttemptRepository {
         data['submittedAt'] is Timestamp;
   }
 
-  // Check the actual server record instead of trusting cached data.
+  // Only a server response can confirm a completed cloud save.
   Future<AttemptResult> verifyAttempt({
     required String uid,
     required String roundId,
@@ -126,8 +133,7 @@ class AttemptRepository {
     } on TimeoutException {
       return const AttemptResult(
         AttemptStatus.verificationUnavailable,
-        'Server verification timed out. Check your connection '
-        'and try again.',
+        'Server verification timed out. Try again when online.',
       );
     } on FirebaseException catch (error) {
       if (error.code == 'permission-denied' ||
@@ -155,6 +161,7 @@ class AttemptRepository {
     required String roundId,
     required int score,
     bool injectLostAcknowledgement = false,
+    SubmissionFault fault = SubmissionFault.none,
   }) async {
     if (auth.currentUser?.uid != uid) {
       return const AttemptResult(
@@ -170,37 +177,51 @@ class AttemptRepository {
       );
     }
 
+    // T12 development faults happen before any Firestore write.
+    // This lets us test the error states without consuming a round.
+    if (fault == SubmissionFault.unavailable) {
+      return const AttemptResult(
+        AttemptStatus.saveUnknown,
+        'Simulated unavailable: Firestore could not be reached. '
+        'No write was started by this test. Recover from the server.',
+      );
+    }
+
+    if (fault == SubmissionFault.resourceExhausted) {
+      return const AttemptResult(
+        AttemptStatus.saveUnknown,
+        'Simulated resource-exhausted: Firestore reported a '
+        'resource limit. No write was started by this test. '
+        'Recover from the server.',
+      );
+    }
+
     final ref = attemptRef(uid, roundId);
 
     try {
-      // Firestore may rerun a transaction, so no UI changes happen here.
-      await firestore
-          .runTransaction((transaction) async {
-            // Read before writing to avoid overwriting an existing attempt.
-            final existing = await transaction.get(ref);
+      // Read first, then create only when the document is missing.
+      await firestore.runTransaction((transaction) async {
+        final existing = await transaction.get(ref);
 
-            if (existing.exists) {
-              if (!matchesPayload(existing.data(), score)) {
-                throw StateError('Attempt collision');
-              }
+        if (existing.exists) {
+          if (!matchesPayload(existing.data(), score)) {
+            throw StateError('Attempt collision');
+          }
+          return;
+        }
 
-              // The same round was already saved with matching values.
-              return;
-            }
-
-            transaction.set(ref, createPayload(score));
-          })
-          .timeout(const Duration(seconds: 15));
+        transaction.set(ref, createPayload(score));
+      }).timeout(const Duration(seconds: 15));
 
       if (auth.currentUser?.uid != uid) {
         return const AttemptResult(
           AttemptStatus.saveUnknown,
-          'The account changed after submission. '
+          'Authentication changed after submission. '
           'The save outcome needs reconciliation.',
         );
       }
 
-      // Test-only fault: the real transaction already completed.
+      // T09: the real transaction succeeded, but we hide its response.
       if (injectLostAcknowledgement) {
         return const AttemptResult(
           AttemptStatus.saveUnknown,
@@ -209,17 +230,20 @@ class AttemptRepository {
         );
       }
 
-      return verifyAttempt(uid: uid, roundId: roundId, score: score);
+      return verifyAttempt(
+        uid: uid,
+        roundId: roundId,
+        score: score,
+      );
     } on StateError {
       return const AttemptResult(
         AttemptStatus.collision,
         'An attempt with this ID already exists with different values.',
       );
     } on TimeoutException {
-      // A timeout does not prove that Firestore rejected the write.
       return const AttemptResult(
         AttemptStatus.saveUnknown,
-        'Submission timed out. The save outcome is unknown. '
+        'Submission timed out. The outcome is unknown. '
         'Check the server before retrying.',
       );
     } on FirebaseException catch (error) {
@@ -231,11 +255,26 @@ class AttemptRepository {
         );
       }
 
-      // Network and availability failures may have an unknown outcome.
+      if (error.code == 'resource-exhausted') {
+        return const AttemptResult(
+          AttemptStatus.saveUnknown,
+          'Firestore resource limit reached. '
+          'Recover the original round before retrying.',
+        );
+      }
+
+      if (error.code == 'unavailable') {
+        return const AttemptResult(
+          AttemptStatus.saveUnknown,
+          'Firestore is unavailable. '
+          'Recover the original round when online.',
+        );
+      }
+
       return AttemptResult(
         AttemptStatus.saveUnknown,
         'Submission outcome unknown: ${error.code}. '
-        'Recover from the server before retrying.',
+        'Check the server before retrying.',
       );
     } catch (_) {
       return const AttemptResult(
