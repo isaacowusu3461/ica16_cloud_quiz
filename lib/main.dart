@@ -5,11 +5,13 @@ import 'package:flutter/material.dart';
 
 import 'firebase_options.dart';
 import 'screens/quiz_screen.dart';
+import 'screens/security_test_screen.dart';
+import 'screens/validation_test_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Connect Firebase before starting the application.
+  // Initialize Firebase before opening the app.
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   runApp(const CloudQuizApp());
@@ -86,7 +88,7 @@ class _SignInScreenState extends State<SignInScreen> {
     });
 
     try {
-      // Sign in using an existing Firebase Authentication account.
+      // Sign in using Firebase Authentication.
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: emailController.text.trim(),
         password: passwordController.text,
@@ -226,7 +228,6 @@ class _SignedInScreenState extends State<SignedInScreen> {
 
   String? errorMessage;
   String? verificationMessage;
-
   Map<String, dynamic>? verifiedAttempt;
 
   @override
@@ -267,6 +268,20 @@ class _SignedInScreenState extends State<SignedInScreen> {
     );
   }
 
+  void openSecurityTest() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const SecurityTestScreen()),
+    );
+  }
+
+  void openValidationTest() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ValidationTestScreen()),
+    );
+  }
+
   Future<void> verifyPreviousAttempt() async {
     if (isVerifying) return;
 
@@ -295,7 +310,7 @@ class _SignedInScreenState extends State<SignedInScreen> {
     });
 
     try {
-      // Always read from the server, not the local Firestore cache.
+      // Retrieve an existing attempt directly from Firestore.
       final snapshot = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
@@ -305,7 +320,6 @@ class _SignedInScreenState extends State<SignedInScreen> {
 
       if (!mounted) return;
 
-      // Ignore a result if the signed-in account changed during the read.
       if (FirebaseAuth.instance.currentUser?.uid != user.uid) {
         setState(() {
           errorMessage = 'The signed-in account changed.';
@@ -496,6 +510,18 @@ class _SignedInScreenState extends State<SignedInScreen> {
                 ),
                 const SizedBox(height: 20),
                 buildPreviousAttemptSection(),
+                const SizedBox(height: 20),
+                OutlinedButton.icon(
+                  onPressed: openSecurityTest,
+                  icon: const Icon(Icons.security),
+                  label: const Text('T10 Security Test'),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: openValidationTest,
+                  icon: const Icon(Icons.fact_check),
+                  label: const Text('T11 Validation Test'),
+                ),
                 const SizedBox(height: 20),
                 OutlinedButton.icon(
                   onPressed: isSigningOut || isVerifying ? null : signOut,
