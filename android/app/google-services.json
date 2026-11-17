@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1078311725019",
+    "project_id": "ica16-cloud-quiz-a8fe3",
+    "storage_bucket": "ica16-cloud-quiz-a8fe3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1078311725019:android:255ee5ffe7505743cc69fe",
+        "android_client_info": {
+          "package_name": "com.example.ica16_cloud_quiz"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAPXBzwG99HKmObAKV_4Q3y5Fm5rp3YUMw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
