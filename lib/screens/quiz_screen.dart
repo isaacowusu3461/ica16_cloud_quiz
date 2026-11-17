@@ -1,4 +1,3 @@
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -78,8 +77,7 @@ class _QuizScreenState extends State<QuizScreen> {
   bool get canReplay {
     return !isLoading &&
         !isWorking &&
-        ((cloudState == QuizCloudState.readyToSubmit &&
-                !submissionStarted) ||
+        ((cloudState == QuizCloudState.readyToSubmit && !submissionStarted) ||
             cloudState == QuizCloudState.cloudVerified);
   }
 
@@ -252,8 +250,7 @@ class _QuizScreenState extends State<QuizScreen> {
 
     if (!mounted) return;
 
-    if (FirebaseAuth.instance.currentUser?.uid != uid ||
-        roundId != id) {
+    if (FirebaseAuth.instance.currentUser?.uid != uid || roundId != id) {
       setState(() {
         isWorking = false;
         cloudState = QuizCloudState.saveUnknown;
@@ -296,13 +293,11 @@ class _QuizScreenState extends State<QuizScreen> {
 
     if (!mounted) return;
 
-    if (FirebaseAuth.instance.currentUser?.uid != uid ||
-        roundId != id) {
+    if (FirebaseAuth.instance.currentUser?.uid != uid || roundId != id) {
       setState(() {
         isWorking = false;
         cloudState = QuizCloudState.saveUnknown;
-        cloudMessage =
-            'Authentication changed during verification.';
+        cloudMessage = 'Authentication changed during verification.';
       });
       return;
     }
@@ -333,21 +328,14 @@ class _QuizScreenState extends State<QuizScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.wifi_off,
-              size: 56,
-              color: Colors.orange,
-            ),
+            const Icon(Icons.wifi_off, size: 56, color: Colors.orange),
             const SizedBox(height: 16),
             Text(
               errorMessage ?? 'Unable to load questions.',
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
-            FilledButton(
-              onPressed: loadQuestions,
-              child: const Text('Retry'),
-            ),
+            FilledButton(onPressed: loadQuestions, child: const Text('Retry')),
           ],
         ),
       ),
@@ -367,15 +355,10 @@ class _QuizScreenState extends State<QuizScreen> {
         children: [
           Text(
             'Question ${currentQuestionIndex + 1} of 10',
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          LinearProgressIndicator(
-            value: (currentQuestionIndex + 1) / 10,
-          ),
+          LinearProgressIndicator(value: (currentQuestionIndex + 1) / 10),
           const SizedBox(height: 12),
           Text('Current score: $score'),
           const SizedBox(height: 24),
@@ -432,9 +415,7 @@ class _QuizScreenState extends State<QuizScreen> {
             FilledButton(
               onPressed: nextQuestion,
               child: Text(
-                currentQuestionIndex == 9
-                    ? 'View Results'
-                    : 'Next Question',
+                currentQuestionIndex == 9 ? 'View Results' : 'Next Question',
               ),
             ),
           ],
@@ -455,10 +436,7 @@ class _QuizScreenState extends State<QuizScreen> {
         const SizedBox(height: 16),
         const Text(
           'Development Fault Testing',
-          style: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<SubmissionFault>(
@@ -468,10 +446,7 @@ class _QuizScreenState extends State<QuizScreen> {
             border: OutlineInputBorder(),
           ),
           items: const [
-            DropdownMenuItem(
-              value: SubmissionFault.none,
-              child: Text('None'),
-            ),
+            DropdownMenuItem(value: SubmissionFault.none, child: Text('None')),
             DropdownMenuItem(
               value: SubmissionFault.unavailable,
               child: Text('unavailable'),
@@ -520,10 +495,7 @@ class _QuizScreenState extends State<QuizScreen> {
         const SizedBox(height: 12),
         const Text(
           'Cloud Submission',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
         SelectableText('Round ID: ${roundId ?? "Not created"}'),
@@ -548,22 +520,16 @@ class _QuizScreenState extends State<QuizScreen> {
 
         if (canSubmit)
           FilledButton.icon(
-            onPressed: isWorking || !accountMatches
-                ? null
-                : submitQuiz,
+            onPressed: isWorking || !accountMatches ? null : submitQuiz,
             icon: const Icon(Icons.cloud_upload),
             label: Text(
-              submissionStarted
-                  ? 'Retry Same Round ID'
-                  : 'Submit to Firestore',
+              submissionStarted ? 'Retry Same Round ID' : 'Submit to Firestore',
             ),
           ),
 
         if (needsRecovery)
           FilledButton.icon(
-            onPressed: isWorking || !accountMatches
-                ? null
-                : verifySavedAttempt,
+            onPressed: isWorking || !accountMatches ? null : verifySavedAttempt,
             icon: const Icon(Icons.cloud_sync),
             label: const Text('Recover from Server'),
           ),
@@ -618,27 +584,18 @@ class _QuizScreenState extends State<QuizScreen> {
           const Text(
             'Quiz Completed!',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
           Text(
             'Your score: $score / 10',
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 24),
           const Text(
             'Answer Review',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
 
@@ -652,34 +609,28 @@ class _QuizScreenState extends State<QuizScreen> {
                   children: [
                     Text(
                       '${i + 1}. ${questions[i].question}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     Text('Your answer: ${selectedAnswers[i]}'),
                     const SizedBox(height: 4),
-                    Text(
-                      'Correct answer: ${questions[i].correctAnswer}',
-                    ),
+                    Text('Correct answer: ${questions[i].correctAnswer}'),
                     const SizedBox(height: 8),
                     Row(
                       children: [
                         Icon(
-                          selectedAnswers[i] ==
-                                  questions[i].correctAnswer
+                          selectedAnswers[i] == questions[i].correctAnswer
                               ? Icons.check_circle
                               : Icons.cancel,
-                          color: selectedAnswers[i] ==
-                                  questions[i].correctAnswer
+                          color:
+                              selectedAnswers[i] == questions[i].correctAnswer
                               ? Colors.green
                               : Colors.red,
                           size: 18,
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          selectedAnswers[i] ==
-                                  questions[i].correctAnswer
+                          selectedAnswers[i] == questions[i].correctAnswer
                               ? 'Correct'
                               : 'Incorrect',
                         ),
@@ -716,10 +667,10 @@ class _QuizScreenState extends State<QuizScreen> {
         body: isLoading
             ? buildLoadingScreen()
             : questions.isEmpty
-                ? buildErrorScreen()
-                : isFinished
-                    ? buildResultsScreen()
-                    : buildQuizScreen(),
+            ? buildErrorScreen()
+            : isFinished
+            ? buildResultsScreen()
+            : buildQuizScreen(),
       ),
     );
   }

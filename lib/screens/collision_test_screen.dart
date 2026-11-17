@@ -1,4 +1,3 @@
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -9,8 +8,7 @@ class CollisionTestScreen extends StatefulWidget {
   const CollisionTestScreen({super.key});
 
   @override
-  State<CollisionTestScreen> createState() =>
-      _CollisionTestScreenState();
+  State<CollisionTestScreen> createState() => _CollisionTestScreenState();
 }
 
 class _CollisionTestScreenState extends State<CollisionTestScreen> {
@@ -77,8 +75,7 @@ class _CollisionTestScreenState extends State<CollisionTestScreen> {
         if (!mounted) return;
 
         setState(() {
-          errorMessage =
-              'No server-verified attempt was found for this ID.';
+          errorMessage = 'No server-verified attempt was found for this ID.';
         });
         return;
       }
@@ -100,8 +97,7 @@ class _CollisionTestScreenState extends State<CollisionTestScreen> {
       }
 
       // Change the score without changing the round ID.
-      final differentScore =
-          originalScore == 10 ? 9 : originalScore + 1;
+      final differentScore = originalScore == 10 ? 9 : originalScore + 1;
 
       // The repository should detect the existing document and
       // reject the different payload without modifying Firestore.
@@ -127,14 +123,15 @@ class _CollisionTestScreenState extends State<CollisionTestScreen> {
 
       final afterData = after.data();
 
-      final collisionDetected =
-          submission.status == AttemptStatus.collision;
+      final collisionDetected = submission.status == AttemptStatus.collision;
 
-      final scorePreserved = after.exists &&
+      final scorePreserved =
+          after.exists &&
           !after.metadata.hasPendingWrites &&
           afterData?['correctCount'] == originalScore;
 
-      final timestampPreserved = after.exists &&
+      final timestampPreserved =
+          after.exists &&
           !after.metadata.hasPendingWrites &&
           afterData?['submittedAt'] == originalTimestamp;
 
@@ -147,7 +144,7 @@ class _CollisionTestScreenState extends State<CollisionTestScreen> {
         collisionResult = collisionDetected
             ? 'PASS: The repository detected the score collision.'
             : 'FAIL: Expected collision, received '
-                '${submission.status.name}.';
+                  '${submission.status.name}.';
 
         scoreResult = scorePreserved
             ? 'PASS: Original score $originalScore/10 was preserved.'
@@ -204,9 +201,7 @@ class _CollisionTestScreenState extends State<CollisionTestScreen> {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 6),
                   Text(result),
@@ -235,10 +230,7 @@ class _CollisionTestScreenState extends State<CollisionTestScreen> {
           children: [
             const Text(
               'Same-Round ID Collision Test',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             const Text(
@@ -246,9 +238,7 @@ class _CollisionTestScreenState extends State<CollisionTestScreen> {
               'using an existing round ID.',
             ),
             const SizedBox(height: 16),
-            Text(
-              'Current account: ${user?.email ?? "Unknown"}',
-            ),
+            Text('Current account: ${user?.email ?? "Unknown"}'),
             const SizedBox(height: 20),
             TextField(
               controller: roundIdController,
@@ -274,10 +264,7 @@ class _CollisionTestScreenState extends State<CollisionTestScreen> {
             ],
             if (errorMessage != null) ...[
               const SizedBox(height: 16),
-              Text(
-                errorMessage!,
-                style: const TextStyle(color: Colors.red),
-              ),
+              Text(errorMessage!, style: const TextStyle(color: Colors.red)),
             ],
             const SizedBox(height: 16),
             resultCard('Collision detection', collisionResult),

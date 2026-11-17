@@ -1,4 +1,3 @@
-
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -13,11 +12,7 @@ enum AttemptStatus {
   saveUnknown,
 }
 
-enum SubmissionFault {
-  none,
-  unavailable,
-  resourceExhausted,
-}
+enum SubmissionFault { none, unavailable, resourceExhausted }
 
 class AttemptResult {
   final AttemptStatus status;
@@ -31,11 +26,9 @@ class AttemptRepository {
   final FirebaseFirestore firestore;
   final FirebaseAuth auth;
 
-  AttemptRepository({
-    FirebaseFirestore? firestore,
-    FirebaseAuth? auth,
-  })  : firestore = firestore ?? FirebaseFirestore.instance,
-        auth = auth ?? FirebaseAuth.instance;
+  AttemptRepository({FirebaseFirestore? firestore, FirebaseAuth? auth})
+    : firestore = firestore ?? FirebaseFirestore.instance,
+      auth = auth ?? FirebaseAuth.instance;
 
   // Generate the ID before submitting. A retry keeps this same ID.
   String createRoundId() {
@@ -200,18 +193,20 @@ class AttemptRepository {
 
     try {
       // Read first, then create only when the document is missing.
-      await firestore.runTransaction((transaction) async {
-        final existing = await transaction.get(ref);
+      await firestore
+          .runTransaction((transaction) async {
+            final existing = await transaction.get(ref);
 
-        if (existing.exists) {
-          if (!matchesPayload(existing.data(), score)) {
-            throw StateError('Attempt collision');
-          }
-          return;
-        }
+            if (existing.exists) {
+              if (!matchesPayload(existing.data(), score)) {
+                throw StateError('Attempt collision');
+              }
+              return;
+            }
 
-        transaction.set(ref, createPayload(score));
-      }).timeout(const Duration(seconds: 15));
+            transaction.set(ref, createPayload(score));
+          })
+          .timeout(const Duration(seconds: 15));
 
       if (auth.currentUser?.uid != uid) {
         return const AttemptResult(
@@ -230,11 +225,7 @@ class AttemptRepository {
         );
       }
 
-      return verifyAttempt(
-        uid: uid,
-        roundId: roundId,
-        score: score,
-      );
+      return verifyAttempt(uid: uid, roundId: roundId, score: score);
     } on StateError {
       return const AttemptResult(
         AttemptStatus.collision,

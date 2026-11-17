@@ -1,4 +1,3 @@
-
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -11,8 +10,7 @@ class ConcurrencyTestScreen extends StatefulWidget {
   const ConcurrencyTestScreen({super.key});
 
   @override
-  State<ConcurrencyTestScreen> createState() =>
-      _ConcurrencyTestScreenState();
+  State<ConcurrencyTestScreen> createState() => _ConcurrencyTestScreenState();
 }
 
 class _ConcurrencyTestScreenState extends State<ConcurrencyTestScreen> {
@@ -56,16 +54,8 @@ class _ConcurrencyTestScreenState extends State<ConcurrencyTestScreen> {
       // Future.wait starts both operations without waiting for
       // the first one to finish.
       final results = await Future.wait([
-        repository.submitAttempt(
-          uid: uid,
-          roundId: id,
-          score: testScore,
-        ),
-        repository.submitAttempt(
-          uid: uid,
-          roundId: id,
-          score: testScore,
-        ),
+        repository.submitAttempt(uid: uid, roundId: id, score: testScore),
+        repository.submitAttempt(uid: uid, roundId: id, score: testScore),
       ]);
 
       if (!mounted) return;
@@ -102,15 +92,14 @@ class _ConcurrencyTestScreenState extends State<ConcurrencyTestScreen> {
 
       final data = snapshot.data();
 
-      final validDocument = snapshot.exists &&
+      final validDocument =
+          snapshot.exists &&
           !snapshot.metadata.hasPendingWrites &&
           repository.matchesPayload(data, testScore);
 
-      final firstVerified =
-          first.status == AttemptStatus.cloudVerified;
+      final firstVerified = first.status == AttemptStatus.cloudVerified;
 
-      final secondVerified =
-          second.status == AttemptStatus.cloudVerified;
+      final secondVerified = second.status == AttemptStatus.cloudVerified;
 
       setState(() {
         firstResult = firstVerified
@@ -123,7 +112,7 @@ class _ConcurrencyTestScreenState extends State<ConcurrencyTestScreen> {
 
         verificationResult = validDocument
             ? 'PASS: One document exists at the shared round ID '
-                'with the expected score and server timestamp.'
+                  'with the expected score and server timestamp.'
             : 'FAIL: The saved document did not match the expected data.';
       });
     } catch (error) {
@@ -163,9 +152,7 @@ class _ConcurrencyTestScreenState extends State<ConcurrencyTestScreen> {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 6),
                   Text(result),
@@ -194,10 +181,7 @@ class _ConcurrencyTestScreenState extends State<ConcurrencyTestScreen> {
           children: [
             const Text(
               'Concurrent Firestore Submissions',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             const Text(
@@ -205,14 +189,11 @@ class _ConcurrencyTestScreenState extends State<ConcurrencyTestScreen> {
               'twice at nearly the same time.',
             ),
             const SizedBox(height: 16),
-            Text(
-              'Account: ${user?.email ?? "Unknown"}',
-            ),
+            Text('Account: ${user?.email ?? "Unknown"}'),
             const SizedBox(height: 8),
             const Text('Test score: 6 / 10'),
             const SizedBox(height: 8),
-            if (roundId != null)
-              SelectableText('Round ID: $roundId'),
+            if (roundId != null) SelectableText('Round ID: $roundId'),
             const SizedBox(height: 20),
             FilledButton.icon(
               onPressed: isTesting ? null : runTest,
@@ -225,10 +206,7 @@ class _ConcurrencyTestScreenState extends State<ConcurrencyTestScreen> {
             ],
             if (errorMessage != null) ...[
               const SizedBox(height: 16),
-              Text(
-                errorMessage!,
-                style: const TextStyle(color: Colors.red),
-              ),
+              Text(errorMessage!, style: const TextStyle(color: Colors.red)),
             ],
             const SizedBox(height: 16),
             resultCard('First submission', firstResult),
